@@ -15,16 +15,20 @@ services:
     depends_on: [zookeeper]
     ports:
       - "9092:9092"
+      - "29092:29092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT_HOST://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT_HOST://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT_HOST:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   # ── Prefect ───────────────────────────────────────────────
-  prefect-orion:
+  prefect-server:
     image: prefecthq/prefect:2.14.0-python3.10
-    command: prefect orion start --host 0.0.0.0
+    command: prefect server start --host 0.0.0.0
     ports:
       - "4200:4200"
     volumes:
@@ -32,14 +36,13 @@ services:
 
   prefect-worker:
     image: prefecthq/prefect:2.14.0-python3.10
-    command: prefect worker start -p docker -n lab28-worker
+    command: prefect agent start -q lab28-worker
     environment:
-      PREFECT_API_URL: http://prefect-orion:4200/api
+      PREFECT_API_URL: http://prefect-server:4200/api
     volumes:
       - ./prefect/flows:/opt/prefect/flows
       - ./delta-lake:/opt/delta-lake
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on: [prefect-orion, kafka]
+    depends_on: [prefect-server, kafka]
 
   # ── Vector Store (Qdrant) ─────────────────────────────────
   qdrant:
